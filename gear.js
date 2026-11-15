@@ -6,58 +6,69 @@
     ['earrings', 'Серьги'], ['ring', 'Кольцо'], ['bracelet', 'Браслет'], ['belt', 'Пояс']
   ];
   const tiers = [['blue', 'Синька'], ['purple_t1', 'Фиол T1'], ['purple_t2', 'Фиол T2']];
-  const open = document.createElement('button');
-  open.type = 'button';
-  open.className = 'site-button';
-  open.textContent = 'Указать свои вещи';
+  const tierNames = new Map(tiers);
+
+  function button(label, primary = false) {
+    const element = document.createElement('button');
+    element.type = 'button';
+    element.className = primary ? 'site-button site-button-primary' : 'site-button';
+    element.textContent = label;
+    return element;
+  }
+
+  function makeDialog(id, title, content) {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'site-auth-dialog panel gear-dialog';
+    dialog.setAttribute('aria-labelledby', id);
+    dialog.innerHTML = `
+      <header class="site-dialog-header">
+        <h2 id="${id}">${title}</h2>
+        <button type="button" class="site-button site-dialog-close" aria-label="Закрыть">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <path d="m6 6 12 12M18 6 6 18"/>
+          </svg>
+        </button>
+      </header>${content}`;
+    document.body.append(dialog);
+    dialog.querySelector('.site-dialog-close').onclick = () => dialog.close();
+    return dialog;
+  }
+
+  const open = button('Указать свои вещи');
   const actions = document.createElement('div');
   actions.className = 'gear-header-actions';
   authButton.before(actions);
   actions.append(open, authButton);
 
-  const dialog = document.createElement('dialog');
-  dialog.className = 'site-auth-dialog panel gear-dialog';
-  dialog.setAttribute('aria-labelledby', 'gear-title');
-  dialog.innerHTML = `
+  const dialog = makeDialog('gear-title', 'Указать свои вещи', `
     <form>
-      <header class="site-dialog-header">
-        <h2 id="gear-title">Указать свои вещи</h2>
-        <button type="button" class="site-button site-dialog-close" data-close aria-label="Закрыть">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-            <path d="m6 6 12 12M18 6 6 18"/>
-          </svg>
-        </button>
-      </header>
-      <label for="gear-nickname">Никнейм (как в игре)</label>
-      <div class="gear-picker">
-        <input id="gear-nickname" role="combobox" aria-autocomplete="list"
-          aria-controls="gear-options" aria-expanded="false" autocomplete="off" autofocus>
-        <div id="gear-options" class="panel" role="listbox" hidden></div>
-      </div>
-      ${items.map(([key, label]) => `
-        <div class="gear-item${['weapon', 'boots', 'belt'].includes(key) ? ' gear-group-end' : ''}" role="group" aria-labelledby="gear-${key}">
-          <span id="gear-${key}">${label}</span>
-          <div class="loot-segments">
-            ${tiers.map(([value, title], index) => `
-              <label><input type="radio" name="${key}" value="${value}" ${index === 0 ? 'checked' : ''}>
-                <span>${title}</span></label>`).join('')}
-          </div>
-        </div>`).join('')}
+      <label for="gear-nickname">Выберите игрока из списка</label>
+      <select id="gear-nickname" class="gear-picker" required disabled autofocus>
+        <option value="">Выберите никнейм</option>
+      </select>
+      <fieldset class="gear-fields" disabled>
+        <legend class="sr-only">Вещи</legend>
+        ${items.map(([key, label]) => `
+          <div class="gear-item${['weapon', 'boots', 'belt'].includes(key) ? ' gear-group-end' : ''}" role="group" aria-labelledby="gear-${key}">
+            <span id="gear-${key}">${label}</span>
+            <div class="loot-segments">
+              ${tiers.map(([value, title], index) => `
+                <label><input type="radio" name="${key}" value="${value}" ${index === 0 ? 'checked' : ''}>
+                  <span>${title}</span></label>`).join('')}
+            </div>
+          </div>`).join('')}
+      </fieldset>
+      <p class="gear-hint">Вещи обновятся после подтверждения заявки.</p>
       <p role="status"></p>
-      <button type="submit" class="site-button site-button-primary gear-save" aria-disabled="true">Сохранить</button>
-    </form>`;
-  document.body.append(dialog);
-
+      <button type="submit" class="site-button site-button-primary gear-save" disabled>Сохранить</button>
+    </form>`);
   const form = dialog.querySelector('form');
-  const input = dialog.querySelector('#gear-nickname');
-  const options = dialog.querySelector('#gear-options');
+  const picker = dialog.querySelector('#gear-nickname');
+  const fields = dialog.querySelector('.gear-fields');
   const status = dialog.querySelector('[role="status"]');
-  const save = dialog.querySelector('[type="submit"]');
-  let members;
-  let member;
-  let matches = [];
-  let active = -1;
-  let saving = false;
+  const save = form.querySelector('[type="submit"]');
+  const close = dialog.querySelector('.site-dialog-close');
+  let originalEquipment;
   let selectionVersion = 0;
 
   async function gearRequest(endpoint, payload) {
@@ -67,167 +78,204 @@
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(20000)
     });
-    if (!response.ok) throw new Error('Ошибка загрузки вещей');
-    return endpoint === 'aces_player_gear' ? response.json() : undefined;
+    if (!response.ok) throw new Error('Equipment request failed');
+    const body = await response.text();
+    return body ? JSON.parse(body) : null;
   }
 
-  function syncSave() {
-    save.setAttribute('aria-disabled', String(!member || saving));
-  }
-
-  function closeOptions() {
-    options.hidden = true;
-    input.setAttribute('aria-expanded', 'false');
-    input.removeAttribute('aria-activedescendant');
-    active = -1;
-  }
-
-  function showOptions() {
-    closeOptions();
-    const query = input.value.trim().toLocaleLowerCase('ru');
-    matches = members?.filter(player => player.name.toLocaleLowerCase('ru').includes(query)) ?? [];
-    options.replaceChildren(...matches.map((player, index) => {
-      const option = document.createElement('div');
-      option.id = 'gear-option-' + index;
-      option.setAttribute('role', 'option');
-      option.setAttribute('aria-selected', 'false');
-      option.textContent = player.name;
-      option.onpointerdown = event => event.preventDefault();
-      option.onclick = () => choose(player);
-      return option;
-    }));
-    options.hidden = matches.length === 0;
-    input.setAttribute('aria-expanded', String(!options.hidden));
-    if (members) status.textContent = matches.length ? '' : 'Игроки не найдены.';
-  }
-
-  async function choose(player) {
-    member = undefined;
-    input.value = player.name;
-    try {
-      localStorage.setItem(nicknameKey, player.name);
-    } catch {
-      // The form remains usable without local storage.
-    }
-    input.removeAttribute('aria-invalid');
-    status.textContent = '';
-    closeOptions();
-    syncSave();
+  picker.onchange = async () => {
     const selection = ++selectionVersion;
-    status.textContent = 'Загружаем вещи…';
+    originalEquipment = undefined;
+    fields.disabled = true;
+    save.disabled = true;
+    const player = picker.value;
+    status.textContent = player ? 'Загружаем вещи…' : '';
+    if (!player) return;
     try {
-      const equipment = await gearRequest('aces_player_gear', {player_id: String(player.id)});
+      const equipment = await gearRequest('aces_player_gear', {player_id: player});
       if (selection !== selectionVersion || !dialog.open) return;
-      for (const [key] of items) form.elements[key].value = equipment[key] ?? 'blue';
-      member = player;
+      originalEquipment = Object.fromEntries(items.map(([key]) => [key, equipment[key] ?? 'blue']));
+      for (const [key, tier] of Object.entries(originalEquipment)) form.elements[key].value = tier;
+      try {
+        localStorage.setItem(nicknameKey, picker.selectedOptions[0].text);
+      } catch {
+        // The form remains usable without local storage.
+      }
       status.textContent = '';
+      fields.disabled = false;
     } catch {
       if (selection !== selectionVersion || !dialog.open) return;
+      picker.value = '';
       status.textContent = 'Не удалось загрузить вещи. Выберите игрока ещё раз.';
     }
-    syncSave();
-  }
-
-  input.oninput = () => {
-    selectionVersion++;
-    member = undefined;
-    input.removeAttribute('aria-invalid');
-    syncSave();
-    showOptions();
-  };
-  input.onfocus = () => { if (!member && members) showOptions(); };
-  input.onblur = closeOptions;
-  input.onkeydown = event => {
-    if (event.key === 'Escape' && !options.hidden) {
-      event.preventDefault();
-      closeOptions();
-    }
-    if (event.key === 'Enter' && !options.hidden && active >= 0) {
-      event.preventDefault();
-      choose(matches[active]);
-    }
-    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
-    event.preventDefault();
-    if (options.hidden) showOptions();
-    if (options.hidden) return;
-    options.children[active]?.setAttribute('aria-selected', 'false');
-    active = event.key === 'ArrowDown'
-      ? (active + 1) % matches.length
-      : (active <= 0 ? matches.length - 1 : active - 1);
-    const option = options.children[active];
-    option.setAttribute('aria-selected', 'true');
-    input.setAttribute('aria-activedescendant', option.id);
-    option.scrollIntoView({block: 'nearest'});
   };
 
   open.onclick = async () => {
     const opening = ++selectionVersion;
+    originalEquipment = undefined;
     form.reset();
-    member = undefined;
-    input.removeAttribute('aria-invalid');
-    status.textContent = '';
-    syncSave();
-    let cachedName = '';
-    try {
-      cachedName = localStorage.getItem(nicknameKey) ?? '';
-    } catch {
-      // The form remains usable without local storage.
-    }
-    input.value = cachedName;
+    picker.length = 1;
+    picker.disabled = true;
+    fields.disabled = true;
+    save.disabled = true;
+    status.textContent = 'Загружаем список игроков…';
     dialog.showModal();
     try {
-      if (!members) {
-        status.textContent = 'Загружаем список игроков…';
-        members = (await siteData()).members;
+      const {members} = await siteData();
+      if (opening !== selectionVersion || !dialog.open) return;
+      const active = members.filter(player => !player.departed)
+        .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+      for (const player of active) picker.add(new Option(player.name, player.id));
+      status.textContent = active.length ? '' : 'Нет активных игроков.';
+      picker.disabled = !active.length;
+      if (active.length) picker.focus();
+      let cachedName;
+      try {
+        cachedName = localStorage.getItem(nicknameKey);
+      } catch {
+        // The form remains usable without local storage.
       }
-      if (!dialog.open) return;
-      const cachedPlayer = opening === selectionVersion && cachedName
-        && members.find(player => player.name === cachedName);
+      const cachedPlayer = active.find(player => player.name === cachedName);
       if (cachedPlayer) {
-        await choose(cachedPlayer);
-      } else if (document.activeElement === input) {
-        showOptions();
-      } else {
-        status.textContent = '';
+        picker.value = String(cachedPlayer.id);
+        await picker.onchange();
       }
     } catch {
+      if (opening !== selectionVersion || !dialog.open) return;
       status.textContent = 'Не удалось загрузить игроков. Откройте форму ещё раз.';
     }
   };
 
-  dialog.querySelector('[data-close]').onclick = () => dialog.close();
-  dialog.addEventListener('cancel', event => { if (saving) event.preventDefault(); });
+  fields.onchange = () => {
+    status.textContent = '';
+    save.disabled = !originalEquipment || items.every(([key]) =>
+      form.elements[key].value === originalEquipment[key]);
+  };
+  dialog.addEventListener('cancel', event => {
+    if (close.disabled) event.preventDefault();
+  });
   form.onsubmit = async event => {
     event.preventDefault();
-    if (saving) return;
-    if (!member) {
-      input.focus();
-      input.setAttribute('aria-invalid', 'true');
-      status.textContent = 'Заполните имя персонажа, выбрав игрока из списка.';
-      return;
-    }
-
-    saving = true;
-    syncSave();
+    if (save.disabled || !picker.value) return;
     const equipment = Object.fromEntries(new FormData(form));
-    const cancel = dialog.querySelector('[data-close]');
-    cancel.disabled = true;
-    input.readOnly = true;
-    const radios = form.querySelectorAll('input[type="radio"]');
-    radios.forEach(radio => { radio.disabled = true; });
-    status.textContent = 'Сохраняем…';
+    close.disabled = picker.disabled = fields.disabled = save.disabled = true;
+    status.textContent = 'Отправляем заявку…';
     try {
-      await gearRequest('aces_save_gear', {player_id: String(member.id), equipment});
+      await gearRequest('aces_submit_gear', {player_id: picker.value, equipment});
       dialog.close();
-      document.dispatchEvent(new Event('aces-gear-saved'));
+      refreshQueue();
     } catch {
-      status.textContent = 'Не удалось сохранить вещи. Попробуйте ещё раз.';
+      status.textContent = 'Не удалось отправить заявку. Попробуйте ещё раз.';
+      save.disabled = false;
     } finally {
-      saving = false;
-      cancel.disabled = false;
-      input.readOnly = false;
-      radios.forEach(radio => { radio.disabled = false; });
-      syncSave();
+      close.disabled = picker.disabled = fields.disabled = false;
     }
   };
+
+  const queue = document.getElementById('gear-queue');
+  const gate = document.getElementById('gear-queue-gate');
+  const requestsNav = document.querySelector('[data-requests-nav]');
+  const queueStatus = queue?.querySelector('[role="status"]');
+  const requestList = queue?.querySelector('.gear-requests');
+  let queueVersion = 0;
+
+  function adminRequest(endpoint, payload = {}) {
+    return gearRequest(endpoint, {
+      ...payload,
+      p_password: sessionStorage.getItem('aces-admin-password')
+    });
+  }
+
+  async function loadQueue(confirmed = false) {
+    const version = ++queueVersion;
+    if (queue && !requestList.children.length && !queueStatus.textContent) {
+      queueStatus.textContent = 'Загружаем заявки…';
+    }
+    try {
+      const requests = await adminRequest('aces_pending_gear');
+      if (version !== queueVersion || !isLootVisible()) return;
+      if (requestsNav) requestsNav.textContent = requests.length ? `Заявки (${requests.length})` : 'Заявки';
+      if (queue) {
+        const empty = requests.length ? '' : 'Нет заявок на подтверждение.';
+        queueStatus.textContent = confirmed
+          ? (requests.length ? 'Заявка подтверждена.' : 'Заявка подтверждена. Очередь пуста.')
+          : empty;
+        requestList.replaceChildren(...requests.map(renderRequest));
+      }
+    } catch {
+      if (version !== queueVersion || !queue) return;
+      queueStatus.textContent = confirmed
+        ? 'Заявка подтверждена. Не удалось обновить список.'
+        : 'Не удалось загрузить заявки. Проверьте вход и откройте раздел ещё раз.';
+    }
+  }
+
+  function renderRequest(request) {
+    const card = document.createElement('li');
+    card.className = 'panel gear-request';
+    const name = document.createElement('h3');
+    name.textContent = request.name;
+    card.append(name);
+
+    const changes = items.filter(([key]) => Object.hasOwn(request.changes, key));
+    if (changes.length) {
+      const list = document.createElement('ul');
+      for (const [key, label] of changes) {
+        const change = document.createElement('li');
+        change.textContent = `${label} · ${tierNames.get(request.before[key])} → ${tierNames.get(request.changes[key])}`;
+        list.append(change);
+      }
+      card.append(list);
+    } else {
+      const unchanged = document.createElement('p');
+      unchanged.textContent = 'Без изменений по вещам.';
+      card.append(unchanged);
+    }
+
+    const approve = button('Подтвердить', true);
+    approve.setAttribute('aria-label', `Подтвердить заявку игрока ${request.name}`);
+    approve.disabled = !request.active;
+    if (!request.active) {
+      const inactive = document.createElement('p');
+      inactive.textContent = 'Игрок вышел из клана.';
+      card.append(inactive);
+    }
+    approve.onclick = async () => {
+      approve.disabled = true;
+      queueStatus.textContent = '';
+      try {
+        const approved = await adminRequest('aces_approve_gear', {
+          p_request_id: request.id, p_before: request.before
+        });
+        if (!approved) {
+          await loadQueue();
+          queueStatus.textContent = 'Заявка или вещи игрока изменились. Проверьте список ещё раз.';
+          return;
+        }
+        card.remove();
+        document.dispatchEvent(new Event('aces-gear-saved'));
+        await loadQueue(true);
+      } catch {
+        approve.disabled = false;
+        queueStatus.textContent = 'Не удалось подтвердить заявку. Попробуйте ещё раз.';
+      }
+    };
+    card.append(approve);
+    return card;
+  }
+
+  function refreshQueue() {
+    const allowed = isLootVisible();
+    if (queue) {
+      queue.hidden = !allowed;
+      gate.hidden = allowed;
+    }
+    if (allowed && requestsNav) loadQueue();
+  }
+  gate?.querySelector('button').addEventListener('click', openAcesAuth);
+  document.addEventListener('aces-auth-change', refreshQueue);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) refreshQueue();
+  });
+  refreshQueue();
 })();

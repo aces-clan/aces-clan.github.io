@@ -69,7 +69,7 @@ body {
 h1,h2 { color: #f0dfbd; }
 .roster-title span,#roster-updated,.roster .actions span,.roster-columns,
 .scale-note,#period,.foot,.empty,.loading-roster,#events-table time { color: var(--muted); }
-input,.loot-controls select {
+input,.loot-controls select,.gear-picker {
   color: var(--ink);
   background: #0c131a;
   border: 1px solid #6c604c;
@@ -188,6 +188,7 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
 }
 
 [data-loot-nav][hidden],
+[data-requests-nav][hidden],
 .loot-panel[hidden] {
   display: none;
 }
@@ -410,9 +411,9 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
 .gear-header-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   margin-left: auto;
-  flex: none;
 }
 .gear-dialog {
   width: min(460px, calc(100% - 24px));
@@ -452,34 +453,45 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
   line-height: 1.3;
 }
 .gear-picker {
-  position: relative;
-  margin: 6px 0 16px;
-}
-.gear-picker input {
+  appearance: none;
   box-sizing: border-box;
   width: 100%;
   min-height: 40px;
-  padding: 8px 10px;
+  margin: 6px 0 16px;
+  padding: 8px 34px 8px 10px;
   font: inherit;
-  font-size: 16px;
-  font-weight: 500;
+  font-variation-settings: inherit;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+                    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: right 19px center, right 14px center;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
 }
-#gear-options {
-  position: absolute;
-  z-index: 1;
-  inset: 100% 0 auto;
-  max-height: 180px;
-  overflow: auto;
-  padding: 4px;
+.gear-picker option { color: var(--ink); font: inherit; font-variation-settings: inherit; }
+.gear-picker:invalid, .gear-picker option[value=""] { color: var(--muted); }
+.gear-picker:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+@supports (appearance: base-select) {
+  .gear-picker, .gear-picker::picker(select) { appearance: base-select; }
+  .gear-picker::picker-icon { display: none; }
+  .gear-picker::picker(select) {
+    color: var(--ink);
+    background: #0c131a;
+    border: 1px solid var(--edge);
+    font: inherit;
+    font-variation-settings: inherit;
+  }
 }
-#gear-options [role="option"] {
-  padding: 6px 8px;
-  cursor: pointer;
-}
-#gear-options [role="option"]:hover,
-#gear-options [aria-selected="true"] {
-  background: var(--edge);
-}
+.gear-fields { border: 0; margin: 0; padding: 0; min-inline-size: 0; }
+.gear-fields:disabled { opacity: .55; }
+.gear-hint { margin: 8px 0 0; color: var(--muted); font-size: 13px; }
+.gear-queue-panel { margin-top: 22px; }
+.gear-queue-panel h1 { margin-top: 0; }
+.gear-queue-panel [role="status"]:empty { display: none; }
+.gear-requests { display: grid; gap: 10px; padding: 0; margin: 0; list-style: none; }
+.gear-request.panel { padding: 12px; }
+.gear-request h3 { margin: 0 0 8px; font-size: 16px; }
+.gear-request ul { padding-left: 18px; }
+.gear-request p, .gear-request ul { margin: 0 0 12px; font-size: 13px; }
 .gear-item {
   display: flex;
   align-items: center;
@@ -521,10 +533,6 @@ button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible
   min-height: 44px;
   margin-top: 8px;
   font-weight: 700;
-}
-.gear-dialog [aria-disabled="true"] {
-  opacity: .5;
-  cursor: not-allowed;
 }
 .gear-dialog [role="status"] {
   margin: 10px 0;

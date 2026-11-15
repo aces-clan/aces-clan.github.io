@@ -33,6 +33,8 @@ const adminLogin = authForm.elements.username;
 function updateAcesAuth() {
   const session = isLootVisible();
   document.querySelector('[data-loot-nav]').hidden = !session;
+  const requestsNav = document.querySelector('[data-requests-nav]');
+  if (requestsNav) requestsNav.hidden = !session;
   const panel = document.querySelector('.loot-panel');
   if (panel) panel.hidden = !session;
   const gate = document.getElementById('loot-auth-required');
@@ -67,17 +69,42 @@ document.getElementById('loot-auth-open')?.addEventListener('click', openAcesAut
 authForm.querySelector('[data-close]').onclick = () => authDialog.close();
 authDialog.onclose = () => authForm.reset();
 
-authForm.onsubmit = event => {
+authForm.onsubmit = async event => {
   event.preventDefault();
+  const submit = authForm.querySelector('[type=submit]');
+  if (submit.disabled) return;
   const values = new FormData(authForm);
-  if (String(values.get('username')).trim().toLowerCase() !== 'aces' || values.get('password') !== 'Aces7!') {
-    authForm.querySelector('[role=status]').textContent = 'Неверный логин или пароль.';
+  const status = authForm.querySelector('[role=status]');
+  const username = String(values.get('username')).trim();
+  if (username.toLowerCase() !== 'aces') {
+    status.textContent = 'Неверный логин или пароль.';
     return;
   }
+  submit.disabled = true;
+  status.textContent = 'Входим…';
+  try {
+    const response = await fetch(siteProject + '/rest/v1/rpc/aces_check_admin', {
+      method: 'POST',
+      headers: {apikey: lootProjectKey, 'Content-Type': 'application/json'},
+      body: JSON.stringify({p_password: values.get('password')}),
+      signal: AbortSignal.timeout(20000)
+    });
+    if (!response.ok) throw new Error('Login request failed');
+    if (!await response.json()) {
+      status.textContent = 'Неверный логин или пароль.';
+      return;
+    }
+  } catch {
+    status.textContent = 'Не удалось войти. Попробуйте ещё раз.';
+    return;
+  } finally {
+    submit.disabled = false;
+  }
+  if (!authDialog.open) return;
   sessionStorage.setItem(acesAuthKey, 'true');
   sessionStorage.setItem('aces-admin-password', values.get('password'));
   try {
-    localStorage.setItem(adminLoginKey, String(values.get('username')).trim());
+    localStorage.setItem(adminLoginKey, username);
   } catch {
     // Sign-in works without remembering the login.
   }

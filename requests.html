@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ACES · Заявки</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="layout.css">
+  <link rel="stylesheet" href="vampir.css?v=gear-approval2">
+</head>
+<body>
+  <main>
+    <header class="compact-header"><div class="header-brand"><div class="brand"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="brand-shield" d="M16 2 28 7v10c0 5-5 10-12 13C9 27 4 22 4 17V7Z"/><path class="brand-blade" d="m8.5 22 7.5-15 7.5 15h-3.7l-1.7-3.7h-4.2L12.2 22Zm6.6-6.4h1.8L16 13.5Z"/></svg>ACES</div></div><nav class="header-tools" aria-label="Разделы сайта"><a href="index.html">Рейтинг</a><a href="events.html">Мероприятия</a><a href="party.html">Состав рейда</a><a data-loot-nav hidden href="loot.html">Распределение лута</a><a data-requests-nav hidden href="requests.html" aria-current="page">Заявки</a><a href="trinity.html">Стоимость тринити</a></nav></header>
+    <section class="panel gear-queue-panel" id="gear-queue" hidden>
+      <h1>Заявки</h1>
+      <p role="status"></p>
+      <ul class="gear-requests" aria-label="Заявки на изменение вещей"></ul>
+    </section>
+    <section class="panel gear-queue-panel" id="gear-queue-gate" hidden>
+      <h1>Заявки</h1>
+      <p>Войдите, чтобы просмотреть заявки на изменение вещей.</p>
+      <button type="button" class="site-button site-button-primary">Войти</button>
+    </section>
+  </main>
+  <script src="loot-config.js"></script>
+  <script src="app.js?v=supabase1"></script>
+  <script src="site-auth.js?v=gear-approval1"></script>
+  <script src="gear.js?v=10"></script>
+</body>
+</html>
