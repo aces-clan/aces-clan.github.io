@@ -1,0 +1,19 @@
+.trinity-panel { padding: 16px; }
+.trinity-panel > label { display: block; margin-bottom: 6px; }
+.trinity-panel > input { width: 12rem; max-width: 100%; }
+.trinity-scroll { overflow-x: auto; }
+.trinity-scroll table { width: 100%; border-collapse: collapse; }
+.trinity-scroll th, .trinity-scroll td { padding: 4px 8px; text-align: right; }
+.trinity-scroll th:first-child { text-align: left; }
+.trinity-scroll thead th { border-bottom: 1px solid var(--rule); }
+.trinity-scroll tbody tr + tr { border-top: 1px solid var(--rule); }
+.trinity-scroll tbody th { color: var(--muted); font-weight: normal; }
+.trinity-scroll input {
+  width: 100%;
+  min-width: 4rem;
+  box-sizing: border-box;
+  padding: 4px 6px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.trinity-scroll input:not(:hover):not(:focus) { background: transparent; border-color: transparent; }

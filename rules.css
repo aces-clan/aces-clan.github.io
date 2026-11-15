@@ -1,0 +1,35 @@
+.events-toolbar-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px 16px;
+  margin-left: auto;
+  font-size: 13px;
+}
+.rules-dialog {
+  width: min(680px, calc(100% - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow: hidden auto;
+}
+.rules-dialog .site-dialog-header { margin-bottom: 0; }
+.rules-list { list-style: none; padding: 0; margin: 0; counter-reset: loot-rule; }
+.rules-list > li { position: relative; counter-increment: loot-rule; padding: 18px 20px 18px 58px; }
+.rules-list > li + li { border-top: 1px solid var(--rule); }
+.rules-list > li::before { content: counter(loot-rule, decimal-leading-zero); position: absolute; top: 18px; left: 20px; color: var(--gold); font-weight: 700; }
+.rules-list > li:last-child { background: var(--rule); }
+.rules-list h3 { font-size: 18px; margin: 0 0 5px; }
+.rules-list p { margin: 0; font-size: 14px; line-height: 1.55; }
+.rules-list .rules-order { margin-top: 8px; color: var(--gold); font-weight: 600; }
+@media (max-width: 560px) {
+  .rules-list > li { padding-inline: 43px 14px; }
+  .rules-list > li::before { left: 12px; }
+}
+#loot-rules-link {
+  color: var(--gold);
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+#loot-rules-link:hover,
+#loot-rules-link:focus-visible { color: var(--ink); }
