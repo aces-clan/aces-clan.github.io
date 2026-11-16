@@ -1,6 +1,19 @@
 .trinity-panel { padding: 16px; }
-.trinity-panel > label { display: block; margin-bottom: 6px; }
-.trinity-panel > input { width: 12rem; max-width: 100%; }
+.trinity-settings { display: grid; grid-template-columns: 14rem minmax(0, 1fr); gap: 12px 24px; }
+.trinity-rate-field label { display: block; margin-bottom: 6px; }
+.trinity-rate-field input { width: 100%; }
+.trinity-description {
+  display: grid;
+  align-items: center;
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.4;
+}
+@media (max-width: 760px) {
+  .trinity-settings { grid-template-columns: minmax(0, 1fr); }
+  .trinity-rate-field { max-width: 14rem; }
+}
 .trinity-scroll { overflow-x: auto; }
 .trinity-scroll table { width: 100%; border-collapse: collapse; }
 .trinity-scroll th, .trinity-scroll td { padding: 4px 8px; text-align: right; }

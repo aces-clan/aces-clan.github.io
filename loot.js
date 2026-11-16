@@ -9,6 +9,9 @@ const requireGear = document.getElementById('require-gear');
 let gearSubmitted = new Set();
 let newcomers = new Set();
 const ownersByItem = new Map();
+let equipmentOwners = new Map();
+let equipmentState = 'loading';
+let equipmentRequest = 0;
 const wheel = $('loot-wheel');
 const context = wheel.getContext('2d');
 const spin = $('spin');
@@ -81,6 +84,7 @@ async function loadQueue() {
 }
 
 function loadVisibleQueue() {
+  refreshEquipmentOwners();
   if (!isLootVisible()) return;
   queueStatus.textContent = 'Загрузка очереди…';
   loadQueue().catch(() => {
@@ -92,7 +96,8 @@ document.addEventListener('aces-auth-change', loadVisibleQueue);
 loadVisibleQueue();
 
 function updateSpinAvailability() {
-  spin.disabled = !candidates.length || selectedItem === null;
+  spin.disabled = !candidates.length || selectedItem === null
+    || (excludeOwners.checked && equipmentState !== 'ready');
 }
 
 function paint() {
@@ -153,7 +158,38 @@ function renderMembers() {
 }
 
 function ownsSelectedItem(player) {
-  return excludeOwners.checked && ownersByItem.get(selectedItem?.item_id)?.has(player.id);
+  return excludeOwners.checked && selectedItem !== null
+    && (ownersByItem.get(selectedItem.item_id)?.has(player.id)
+      || equipmentOwners.get(selectedItem.thumbnail_path)?.has(String(player.id)));
+}
+
+async function refreshEquipmentOwners() {
+  const request = ++equipmentRequest;
+  equipmentOwners = new Map();
+  equipmentState = 'loading';
+  if (!isLootVisible()) return;
+  updateSpinAvailability();
+  try {
+    const response = await supabase('/rest/v1/rpc/aces_events_equipment', {
+      method: 'POST',
+      body: JSON.stringify({p_password: sessionStorage.getItem('aces-admin-password')}),
+      signal: AbortSignal.timeout(20000)
+    });
+    const equipment = await response.json();
+    if (request !== equipmentRequest) return;
+    for (const [memberId, {items}] of Object.entries(equipment)) {
+      for (const {thumbnail} of items) {
+        if (!thumbnail) continue;
+        if (!equipmentOwners.has(thumbnail)) equipmentOwners.set(thumbnail, new Set());
+        equipmentOwners.get(thumbnail).add(memberId);
+      }
+    }
+    equipmentState = 'ready';
+  } catch {
+    if (request !== equipmentRequest) return;
+    equipmentState = 'failed';
+  }
+  if (selectedItem !== null && !group.disabled) renderMembers();
 }
 
 function requiresGearForm(player) {
@@ -199,7 +235,12 @@ function updateWheel() {
   angle = 0;
   winner = '';
   record.hidden = true;
-  status.textContent = candidates.length ? '' : 'В группе нет участников для розыгрыша.';
+  if (selectedItem !== null && excludeOwners.checked && equipmentState !== 'ready') {
+    status.textContent = equipmentState === 'loading' ? 'Проверяем, у кого уже есть предмет…'
+      : 'Не удалось проверить экипировку. Обнови страницу перед розыгрышем.';
+  } else {
+    status.textContent = candidates.length ? '' : 'В группе нет участников для розыгрыша.';
+  }
   paint();
 }
 

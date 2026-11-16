@@ -6,26 +6,27 @@
   <title>ACES · Тринити</title>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="layout.css?v=loot7">
-  <link rel="stylesheet" href="vampir.css?v=gear-approval2">
-  <link rel="stylesheet" href="trinity.css">
+  <link rel="stylesheet" href="vampir.css?v=sidebar2">
+  <link rel="stylesheet" href="trinity.css?v=panel2">
 </head>
-<body><main>
+<body><div class="site-layout">
 <header class="compact-header"><div class="header-brand"><div class="brand"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="brand-shield" d="M16 2 28 7v10c0 5-5 10-12 13C9 27 4 22 4 17V7Z"/><path class="brand-blade" d="m8.5 22 7.5-15 7.5 15h-3.7l-1.7-3.7h-4.2L12.2 22Zm6.6-6.4h1.8L16 13.5Z"/></svg>ACES</div></div><nav class="header-tools" aria-label="Разделы сайта"><a href="index.html">Рейтинг</a><a href="events.html">Мероприятия</a><a href="party.html">Состав рейда</a><a data-loot-nav hidden href="loot.html">Распределение лута</a><a data-requests-nav hidden href="requests.html">Заявки</a><a href="trinity.html" aria-current="page">Стоимость тринити</a></nav></header>
-<section class="party-intro">
-  <h1>Тринити</h1>
-  <p>Таблица показывает максимальные цены на предметы Blessing. Расчёт учитывает шанс слома при заточке до +15 и разбор уцелевших предметов. Свитки бесплатные.</p>
-  <p>Измени порог или введи цену в ячейку. Остальные цены пересчитаются. Прочерк означает, что предел ниже рыночного минимума в 50 бриллиантов.</p>
-</section>
+<main>
 <section class="panel trinity-panel" aria-label="Калькулятор цен">
-  <label for="trinity-rate">Trinity за 1 бриллиант</label>
-  <input id="trinity-rate" type="text" inputmode="decimal" value="4" aria-describedby="trinity-status">
+  <div class="trinity-settings">
+    <div class="trinity-rate-field">
+      <label for="trinity-rate">Тринити за один бриллиант</label>
+      <input id="trinity-rate" type="text" inputmode="decimal" value="4" aria-describedby="trinity-status">
+    </div>
+    <p class="trinity-description">Максимальные цены на Blessing учитывают риск слома при заточке до +15 и разбор уцелевших вещей. Свитки бесплатные. Измени порог или цену в ячейке, чтобы пересчитать таблицу. Прочерк означает цену ниже 50 бриллиантов.</p>
+  </div>
   <p id="trinity-status" role="status"></p>
   <div class="trinity-scroll"><table aria-label="Предельные цены покупки в бриллиантах">
     <thead><tr><th scope="col">Уровень</th><th scope="col" class="text-end">Оружие T1</th><th scope="col" class="text-end">Броня T1</th><th scope="col" class="text-end">Броня T2</th><th scope="col" class="text-end">Бижутерия T1</th></tr></thead>
     <tbody></tbody>
   </table></div>
 </section>
-</main>
+</main></div>
 <script src="loot-config.js"></script><script src="app.js?v=supabase1"></script><script src="site-auth.js?v=gear-approval1"></script><script src="gear.js?v=10"></script>
 <script src="trinity.js"></script>
 </body>

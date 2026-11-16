@@ -1,14 +1,117 @@
 <!doctype html>
-<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="preload" href="fonts/gt-pressura-vf.ttf" as="font" type="font/ttf" crossorigin><title>ACES · Рейтинг и история BM</title><meta name="description" content="Рейтинг игроков клана ACES и история боевой мощи. Выберите игроков в списке для сравнения на графике."><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="layout.css?v=loot7"><link rel="stylesheet" href="vampir.css?v=gear-approval2"></head>
-<body class="loot-page"><main><header class="compact-header"><div class="header-brand"><div class="brand"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="brand-shield" d="M16 2 28 7v10c0 5-5 10-12 13C9 27 4 22 4 17V7Z"/><path class="brand-blade" d="m8.5 22 7.5-15 7.5 15h-3.7l-1.7-3.7h-4.2L12.2 22Zm6.6-6.4h1.8L16 13.5Z"/></svg>ACES</div></div><nav class="header-tools" aria-label="Разделы сайта"><a href="index.html">Рейтинг</a><a href="events.html">Мероприятия</a><a href="party.html">Состав рейда</a><a data-loot-nav hidden href="loot.html" aria-current="page">Распределение лута</a><a data-requests-nav hidden href="requests.html">Заявки</a><a href="trinity.html">Стоимость тринити</a></nav></header><p id="loot-auth-required">Для доступа к луту <button id="loot-auth-open" type="button">войди</button>.</p><section class="panel loot-panel" hidden>
-<h1>Колесо лута</h1>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="preload" href="fonts/gt-pressura-vf.ttf" as="font" type="font/ttf" crossorigin><title>ACES · Распределение лута</title><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="layout.css?v=loot8"><link rel="stylesheet" href="vampir.css?v=loot-layout1">
+<style>
+.loot-panel {
+  min-height: var(--site-height);
+  grid-template-columns: minmax(0, 440px) minmax(0, 1fr);
+  grid-template-areas: "title title" "controls controls" "participants draw";
+  gap: 20px;
+}
+.loot-controls {
+  padding: 12px 16px;
+  border: 1px solid var(--rule);
+  background: #0c131a;
+}
+.loot-controls #loot-items {
+  display: flex;
+  flex-wrap: wrap;
+}
+.loot-controls #loot-items label {
+  max-width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--rule);
+  border-bottom: 2px solid var(--rule);
+  background: #11191f;
+}
+.loot-controls #loot-items label:has(input:checked) {
+  color: #ffebc3;
+  background: linear-gradient(#21191e, #492627);
+  border-bottom-color: #f1b07e;
+}
+.loot-controls #loot-items input { accent-color: var(--gold); }
+.loot-participants {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  min-height: 0;
+  gap: 16px;
+}
+#loot-group .loot-segments label { position: relative; }
+#loot-group .loot-segments input { inset-inline-start: 0; width: 1px; height: 1px; margin: 0; padding: 0; }
+.loot-filters {
+  border: 1px solid var(--rule);
+}
+.loot-filters summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 36px;
+  padding: 6px 12px;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: inherit;
+  list-style: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+.loot-filters summary:hover { background: #ffffff0a; }
+.loot-filters summary:focus-visible { outline: 1px solid var(--gold); outline-offset: -2px; }
+.loot-filters summary::-webkit-details-marker { display: none; }
+.loot-filters summary::after {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin: 0 3px;
+  border-right: 1px solid var(--gold);
+  border-bottom: 1px solid var(--gold);
+  transform: rotate(-45deg);
+}
+.loot-filters[open] summary::after { transform: rotate(45deg); }
+.loot-participants .loot-exclusion {
+  display: grid;
+  gap: 8px;
+  padding: 4px 12px 12px;
+}
+.loot-participants #loot-members {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+#loot-member-list { flex: 1; min-height: 0; overflow: auto; align-content: start; }
+.loot-draw {
+  position: static;
+  align-self: stretch;
+  grid-template-rows: minmax(0, 1fr);
+}
+.loot-draw .wheel-wrap { align-self: center; max-width: 500px; }
+@media (min-width: 981px) and (min-height: 700px) {
+  .loot-panel { height: var(--site-height); grid-template-rows: auto auto minmax(0, 1fr); }
+  .loot-controls #loot-items { max-height: 6rem; overflow: auto; }
+  .loot-draw .wheel-wrap { max-width: min(500px, calc(100dvh - 350px)); }
+}
+@media (max-width: 980px) {
+  .loot-panel {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "title" "controls" "participants" "draw";
+  }
+  .loot-draw { min-height: var(--site-height); }
+}
+</style>
+</head>
+<body class="loot-page"><div class="site-layout"><header class="compact-header"><div class="header-brand"><div class="brand"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path class="brand-shield" d="M16 2 28 7v10c0 5-5 10-12 13C9 27 4 22 4 17V7Z"/><path class="brand-blade" d="m8.5 22 7.5-15 7.5 15h-3.7l-1.7-3.7h-4.2L12.2 22Zm6.6-6.4h1.8L16 13.5Z"/></svg>ACES</div></div><nav class="header-tools" aria-label="Разделы сайта"><a href="index.html">Рейтинг</a><a href="events.html">Мероприятия</a><a href="party.html">Состав рейда</a><a data-loot-nav hidden href="loot.html" aria-current="page">Распределение лута</a><a data-requests-nav hidden href="requests.html">Заявки</a><a href="trinity.html">Стоимость тринити</a></nav></header><main><p id="loot-auth-required">Для доступа к луту <button id="loot-auth-open" type="button">войди</button>.</p><section class="panel loot-panel" hidden>
+<h1>Распределение лута</h1>
 <div class="loot-controls">
 <p id="loot-queue-status" role="status"></p>
 <fieldset id="loot-queue" hidden>
 <legend>Нераспределённые предметы</legend>
 <div id="loot-items"></div>
 </fieldset>
-<div class="loot-draw-controls">
+</div>
+<div class="loot-participants">
 <fieldset id="loot-group" class="loot-groups" disabled>
 <legend>Группа</legend>
 <div class="loot-segments">
@@ -17,27 +120,31 @@
 <label><input type="radio" name="loot-group" value="3"><span>Группа 3</span></label>
 </div>
 </fieldset>
-<div class="loot-spin-actions">
-<button id="spin" disabled>Крутить колесо</button>
-<button id="record-loot" hidden>Подтвердить распределение</button>
-</div>
-</div>
-<p id="page-status" role="status">Загрузка состава…</p>
-<fieldset class="loot-exclusion">
-<legend>Исключить из розыгрыша</legend>
+<details class="loot-filters">
+<summary>Правила исключения из розыгрыша</summary>
+<fieldset class="loot-exclusion" aria-label="Правила исключения">
 <label><input type="checkbox" id="exclude-last" checked> Последнего получателя</label>
 <label><input type="checkbox" id="exclude-owners" checked> Тех, у кого уже есть предмет</label>
 <label><input type="checkbox" id="require-gear" checked> Тех, кто не указал свои вещи</label>
 <label><input type="checkbox" id="exclude-newcomers" checked> Тех, кто в клане менее 7 дней</label>
 </fieldset>
+</details>
 <fieldset id="loot-members" disabled>
 <legend id="candidates">Участники</legend>
 <div id="loot-member-list"></div>
 </fieldset>
 <p id="last-recipient"></p>
 </div>
-<div class="wheel-wrap"><div class="wheel-pointer"></div><canvas id="loot-wheel" width="560" height="560" aria-label="Колесо распределения лута"></canvas></div>
-</section></main><script src="loot-config.js"></script><script src="app.js?v=supabase1"></script><script src="site-auth.js?v=gear-approval1"></script><script src="gear.js?v=10"></script><script src="loot.js?v=draw-filters1"></script></body></html>
+<div class="loot-draw">
+<div class="wheel-wrap"><div class="wheel-pointer" aria-hidden="true"></div><canvas id="loot-wheel" width="560" height="560" aria-label="Колесо распределения лута"></canvas></div>
+<p id="page-status" role="status">Загрузка состава…</p>
+<div class="loot-spin-actions">
+<button class="site-button site-button-primary" id="spin" type="button" disabled>Крутить колесо</button>
+<button class="site-button" id="record-loot" type="button" hidden>Подтвердить распределение</button>
+</div>
+</div>
+</section></main></div><script src="loot-config.js"></script><script src="app.js?v=supabase1"></script><script src="site-auth.js?v=gear-approval1"></script><script src="gear.js?v=10"></script><script src="loot.js?v=draw-filters2"></script>
+</body></html>
 
 
 

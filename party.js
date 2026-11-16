@@ -215,7 +215,6 @@ function partyPlayerAllowed(player, index) {
 function renderParties() {
   const host = $('party-groups');
   host.replaceChildren();
-  $('party-edit-hint').hidden = !canEditParties();
   $('party-attendance-control').hidden = !canEditParties();
   $('party-attendance').disabled = partySaving || !canEditParties();
   $('party-save').hidden = !canEditParties();
