@@ -1,4 +1,3 @@
-const eventsGearFilter = $('events-gear-only');
 let eventsEquipment = {};
 
 const gearSlotNames = {
@@ -56,8 +55,8 @@ const dayPlural = new Intl.PluralRules('ru-RU');
 let closePlayerCard = () => {};
 
 function playerCardRows(player, stats, rosterDays, today) {
-  const left = player.departed && stats.lastSeen
-    ? rosterDays.find(day => day > stats.lastSeen) : null;
+  const left = player.departed_on || (player.departed && stats.lastSeen
+    ? rosterDays.find(day => day > stats.lastSeen) : null);
   const end = player.departed ? left || stats.lastSeen : today;
   const days = stats.joined && end
     ? Math.max(0, (Date.parse(end) - Date.parse(stats.joined)) / 86400000) : null;
@@ -67,7 +66,7 @@ function playerCardRows(player, stats, rosterDays, today) {
   const total = stats.present + stats.absent;
   return [
     ['Вступление', stats.joined ? formatSiteDate(stats.joined) : '—'],
-    ...(player.departed ? [['Уход', left ? `≈ ${formatSiteDate(left)}` : 'Дата неизвестна']] : []),
+    ...(player.departed ? [['Уход', left ? `${player.departed_on ? '' : '≈ '}${formatSiteDate(left)}` : 'Дата неизвестна']] : []),
     ['В клане', duration === '—' || !player.departed || stats.joined === '2026-11-01'
       ? duration : `${left ? '≈ ' : 'не менее '}${duration}`],
     [player.departed ? 'Последняя БМ' : 'БМ', player.bm == null ? '—' : fmt(player.bm)],
@@ -120,58 +119,66 @@ function addPlayerCard(cell, player, stats, rosterDays) {
   cell.addEventListener('focus', () => { if (cell.matches(':focus-visible')) open(); });
   cell.addEventListener('blur', close);
   cell.addEventListener('click', event => {
-    if (event.target.closest('.event-player-card')) return;
+    if (event.target.closest('.event-player-card, button')) return;
     if (event.pointerType === 'touch' && card.matches(':popover-open')) close();
     else open();
   });
 }
 
-siteData(true, true).then(snapshot => {
-  roster = snapshot.members;
-  const rosterDays = [...new Set(snapshot.history.map(([, day]) => day))].sort();
-  const refresh = () => {
-    closePlayerCard();
-    const members = isLootVisible() && eventsGearFilter.checked
-      ? roster.filter(player => eventsEquipment[player.id]?.completed)
-      : roster;
-    renderEvents(snapshot.events, snapshot.history,
-      (cell, player, stats) => addPlayerCard(cell, player, stats, rosterDays), members);
-  };
-  refresh();
-  for (const id of ['events-sort', 'events-direction']) {
-    $(id).onchange = refresh;
+let eventsSnapshot;
+let eventsDataVersion = 0;
+function renderEventsSnapshot() {
+  if (!eventsSnapshot) return;
+  closePlayerCard();
+  const snapshot = eventsSnapshot;
+  const days = [...new Set(snapshot.history.map(([, day]) => day))].sort();
+  renderEvents(isLootVisible() ? snapshot.events : snapshot.events.filter(event => event.confirmed !== false), snapshot.history, (cell, player, stats) => {
+    addPlayerCard(cell, player, stats, days);
+    decorateMemberActions(cell, player);
+  }, roster, decorateEventAttendance, decorateEventHeading);
+}
+async function refreshEventsData(message = '') {
+  const version = ++eventsDataVersion;
+  $('events-admin-actions').hidden = !isLootVisible();
+  try {
+    const snapshot = await siteData(true, true);
+    if (isLootVisible()) snapshot.events = await acesAdminRequest('aces_admin_events');
+    if (version !== eventsDataVersion) return;
+    eventsSnapshot = snapshot;
+    roster = snapshot.members;
+    renderEventsSnapshot();
+    $('page-status').textContent = message;
+  } catch {
+    if (version === eventsDataVersion) $('page-status').textContent = message ? message + ' Не удалось обновить таблицу. Обновите страницу.' : 'Не удалось обновить мероприятия. Попробуйте ещё раз.';
   }
-  document.querySelector('.events-scroll').addEventListener('scroll', () => closePlayerCard());
-  window.addEventListener('resize', () => closePlayerCard());
-  document.addEventListener('keydown', event => { if (event.key === 'Escape') closePlayerCard(); });
-  document.addEventListener('pointerdown', event => {
-    if (!event.target.closest('#events-table tbody th')) closePlayerCard();
-  });
-  $('page-status').textContent = '';
-  eventsGearFilter.onchange = refresh;
-  let gearRequest = 0;
-  async function refreshEquipment() {
-    const request = ++gearRequest;
-    eventsGearFilter.closest('label').hidden = !isLootVisible();
-    if (!isLootVisible()) return;
-    try {
-      const equipment = await loadEventsEquipment();
-      if (request !== gearRequest) return;
-      eventsEquipment = equipment;
-      eventsGearFilter.disabled = false;
-      $('page-status').textContent = '';
-      refresh();
-    } catch {
-      if (request !== gearRequest) return;
-      $('page-status').textContent = 'Не удалось загрузить сведения о вещах.';
-    }
-  }
-  document.addEventListener('aces-auth-change', refreshEquipment);
-  document.addEventListener('aces-gear-saved', refreshEquipment);
-  refreshEquipment();
-}).catch(() => {
-  $('page-status').textContent = 'Не удалось загрузить мероприятия. Обновите страницу.';
+}
+for (const id of ['events-sort', 'events-direction']) $(id).onchange = renderEventsSnapshot;
+document.querySelector('.events-scroll').addEventListener('scroll', () => closePlayerCard());
+window.addEventListener('resize', () => closePlayerCard());
+document.addEventListener('keydown', event => { if (event.key === 'Escape') closePlayerCard(); });
+document.addEventListener('pointerdown', event => {
+  if (!event.target.closest('#events-table tbody th')) closePlayerCard();
 });
+let eventsEquipmentVersion = 0;
+async function refreshEventsEquipment() {
+  const version = ++eventsEquipmentVersion;
+  if (!isLootVisible()) { eventsEquipment = {}; renderEventsSnapshot(); return; }
+  try {
+    const equipment = await loadEventsEquipment();
+    if (version !== eventsEquipmentVersion || !isLootVisible()) return;
+    eventsEquipment = equipment;
+    renderEventsSnapshot();
+  } catch {
+    // Equipment cards are optional; attendance editing remains available.
+  }
+}
+document.addEventListener('aces-auth-change', () => {
+  refreshEventsData(); refreshEventsEquipment();
+});
+document.addEventListener('aces-gear-saved', refreshEventsEquipment);
+document.addEventListener('aces-member-saved', () => { refreshEventsData(); refreshEventsEquipment(); });
+refreshEventsData();
+refreshEventsEquipment();
 
 const rulesDialog = $('loot-rules');
 $('loot-rules-link').addEventListener('click', event => {

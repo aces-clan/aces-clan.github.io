@@ -49,9 +49,9 @@
       </select>
       <fieldset class="gear-fields" disabled>
         <legend class="sr-only">Вещи</legend>
-        <label for="gear-power">Боевая мощь</label>
+        <div class="gear-field-heading"><label for="gear-power">Боевая мощь</label>
+          <span id="gear-power-hint" class="gear-hint">Укажите, если изменилась.</span></div>
         <input id="gear-power" type="number" min="1" max="2147483647" step="1" inputmode="numeric" autocomplete="off" aria-describedby="gear-power-hint">
-        <p id="gear-power-hint" class="gear-hint">Укажите, если изменилась.</p>
         ${items.map(([key, label]) => `
           <div class="gear-item${['weapon', 'boots', 'belt'].includes(key) ? ' gear-group-end' : ''}" role="group" aria-labelledby="gear-${key}">
             <span id="gear-${key}">${label}</span>

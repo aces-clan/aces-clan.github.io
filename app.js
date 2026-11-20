@@ -2,6 +2,14 @@ const selected=new Set(['Dobbi']); let data=[],dates=[],roster=[],rosterUpdated=
 const $=id=>document.getElementById(id),fmt=n=>Math.round(n).toLocaleString('ru-RU');
 const siteProject = 'https://tcgrrvicfwlqwdivnwmk.supabase.co';
 
+function itemThumbnailPlaceholder() {
+  const holder = document.createElement('span');
+  holder.className = 'item-thumbnail';
+  holder.setAttribute('aria-hidden', 'true');
+  holder.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="m7 15 3-3 3 3 2-2 3 3M8 8h2"/></svg>';
+  return holder;
+}
+
 async function siteData(includeHistory = false, includeEvents = false) {
   const response = await fetch(siteProject + '/rest/v1/rpc/aces_site_data', {
     method: 'POST',
@@ -93,14 +101,16 @@ function eventMemberStats(player, clanEvents, history) {
   const days = new Set(history.filter(([id]) => id === player.id).map(([, day]) => day));
   let present = 0, total = 0;
   for (const event of clanEvents) {
+    if (event.confirmed === false) continue;
+    const eligible = event.eligible ? event.eligible.includes(player.id) : days.has(event.date);
     const attended = event.attendance.includes(player.id);
-    if (attended || days.has(event.date)) {
+    if (eligible) {
       total++;
       if (attended) present++;
     }
   }
   const orderedDays = [...days].sort();
-  return {joined: orderedDays[0] || null, lastSeen: orderedDays.at(-1), present, absent: total - present};
+  return {joined: player.joined_on || orderedDays[0] || null, lastSeen: orderedDays.at(-1), present, absent: total - present};
 }
 
 function sortEventMembers(members, clanEvents, history, key, direction) {
@@ -121,7 +131,8 @@ function sortEventMembers(members, clanEvents, history, key, direction) {
   return [...active, ...members.filter(player => player.departed)];
 }
 
-function renderEvents(clanEvents, history, decoratePlayer, members = roster) {
+function renderEvents(clanEvents, history, decoratePlayer, members = roster, decorateCell, decorateHeading) {
+  clanEvents = [...clanEvents].sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id);
   const membersByDate = new Map();
   for (const [memberId, date] of history) {
     if (!membersByDate.has(date)) membersByDate.set(date, new Set());
@@ -140,7 +151,11 @@ function renderEvents(clanEvents, history, decoratePlayer, members = roster) {
     const date = document.createElement('time');
     date.textContent = formatSiteDate(event.date);
     date.dateTime = event.date;
-    cell.append(document.createTextNode(event.name), date);
+    const title = document.createElement('span');
+    title.className = 'event-title';
+    title.textContent = event.name;
+    cell.append(title, date);
+    decorateHeading?.(cell, event);
     heading.append(cell);
   }
   eventTable.tHead.replaceChildren(heading);
@@ -149,7 +164,23 @@ function renderEvents(clanEvents, history, decoratePlayer, members = roster) {
   const sortKey = document.querySelector('input[name="events-sort"]:checked')?.value || 'bm';
   const sortedRoster = sortEventMembers(members, clanEvents, history,
     sortKey, document.querySelector('input[name="events-direction"]:checked')?.value || 'desc');
+  let departedSection = false;
   for (const player of sortedRoster) {
+    if (player.departed && !departedSection) {
+      departedSection = true;
+      const separator = document.createElement('tr');
+      separator.className = 'event-departed-divider';
+      const label = document.createElement('th');
+      label.scope = 'row';
+      label.textContent = 'Выбыли из клана';
+      separator.append(label);
+      if (clanEvents.length) {
+        const filler = document.createElement('td');
+        filler.colSpan = clanEvents.length;
+        separator.append(filler);
+      }
+      body.append(separator);
+    }
     const row = document.createElement('tr');
     row.classList.toggle('departed-player', player.departed);
     const name = document.createElement('th');
@@ -182,6 +213,8 @@ function renderEvents(clanEvents, history, decoratePlayer, members = roster) {
     row.append(name);
     for (const event of clanEvents) {
       const cell = document.createElement('td');
+      const wasMember = event.eligible ? event.eligible.includes(player.id) : membersByDate.get(event.date)?.has(player.id);
+      const attended = !!wasMember && event.attendance.includes(player.id);
       const awards = event.loot.filter(item => item.winner === player.id);
       for (const item of awards) {
         const badge = document.createElement('span');
@@ -214,14 +247,13 @@ function renderEvents(clanEvents, history, decoratePlayer, members = roster) {
         cell.append(entry);
       }
       if (!awards.length) {
-        const attended = event.attendance.includes(player.id);
-        const wasMember = membersByDate.get(event.date)?.has(player.id);
-        cell.textContent = attended ? '+' : wasMember ? '−' : '·';
+        cell.textContent = attended ? '+' : wasMember && event.confirmed !== false ? '−' : '·';
         if (attended) cell.className = 'event-present';
-        else if (wasMember) cell.className = 'event-absent';
+        else if (wasMember && event.confirmed !== false) cell.className = 'event-absent';
       } else {
         cell.className = 'loot-cell';
       }
+      decorateCell?.(cell, player, event, !!wasMember, attended);
       row.append(cell);
     }
     body.append(row);

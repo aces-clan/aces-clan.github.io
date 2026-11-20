@@ -52,8 +52,11 @@ function partyAttendance(player, events, history) {
   const days = new Set(history.filter(([id]) => id === player.id).map(([, day]) => day));
   let present = 0, absent = 0;
   for (const event of events) {
+    if (event.confirmed === false) continue;
+    const eligible = event.eligible ? event.eligible.includes(player.id) : days.has(event.date);
+    if (!eligible) continue;
     if (event.attendance.includes(player.id)) present++;
-    else if (days.has(event.date) && !(event.loot || []).some(item => item.winner === player.id)) absent++;
+    else if (!(event.loot || []).some(item => item.winner === player.id)) absent++;
   }
   return {present, absent};
 }

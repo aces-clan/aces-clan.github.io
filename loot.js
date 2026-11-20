@@ -53,6 +53,8 @@ async function loadQueue() {
   imageUrls.forEach(url => URL.revokeObjectURL(url));
   imageUrls = [];
   const labels = await Promise.all(items.map(async item => {
+    const entry = document.createElement('div');
+    entry.className = 'loot-queue-item';
     const label = document.createElement('label');
     const input = document.createElement('input');
     input.type = 'radio';
@@ -63,19 +65,46 @@ async function loadQueue() {
     };
     const image = document.createElement('img');
     image.alt = '';
+    const thumbnail = itemThumbnailPlaceholder();
+    label.append(input, thumbnail);
     try {
       const path = item.thumbnail_path.split('/').map(encodeURIComponent).join('/');
       const file = await supabase('/storage/v1/object/authenticated/aces-loot/' + path);
       image.src = URL.createObjectURL(await file.blob());
       imageUrls.push(image.src);
-      label.append(input, image);
+      image.onload = () => thumbnail.replaceChildren(image);
     } catch {
-      label.append(input);
+      // Keep the same-size placeholder when no thumbnail is available.
     }
     const caption = document.createElement('span');
     caption.textContent = item.name;
     label.append(caption);
-    return label;
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'site-button site-icon-button';
+    remove.title = 'Убрать из нераспределённых';
+    remove.setAttribute('aria-label', `Убрать из нераспределённых: ${item.name}`);
+    remove.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>';
+    remove.onclick = async () => {
+      if (remove.disabled || !isLootVisible()) return;
+      remove.disabled = input.disabled = true;
+      queueStatus.textContent = 'Убираем предмет…';
+      try {
+        const removed = await acesAdminRequest('aces_remove_loot', {p_loot_id: item.id});
+        try {
+          await loadQueue();
+          if (!removed) queueStatus.textContent = 'Предмет уже распределён или недоступен. Очередь обновлена.';
+        } catch {
+          queueStatus.textContent = removed ? 'Предмет убран. Не удалось обновить очередь. Обновите страницу.'
+            : 'Предмет уже распределён или недоступен. Обновите страницу.';
+        }
+      } catch {
+        remove.disabled = input.disabled = false;
+        queueStatus.textContent = 'Не удалось убрать предмет. Попробуйте ещё раз.';
+      }
+    };
+    entry.append(label, remove);
+    return entry;
   }));
   $('loot-items').replaceChildren(...labels);
   queue.hidden = !labels.length;
@@ -297,6 +326,7 @@ record.onclick = async () => {
   }
 };
 function addOwner(itemId, memberId) {
+  if (itemId == null) return;
   if (!ownersByItem.has(itemId)) ownersByItem.set(itemId, new Set());
   ownersByItem.get(itemId).add(memberId);
 }
@@ -313,9 +343,9 @@ function findNewcomers(history) {
   for (const player of roster) {
     if (player.departed) continue;
     const absent = dates.findLastIndex(date => !snapshots.get(date).has(player.id));
-    const joined = dates[absent + 1];
+    const joined = player.joined_on || dates[absent + 1];
     // Players already present in the earliest snapshot have no known start date.
-    if (absent >= 0 && joined && Date.parse(today) - Date.parse(joined) < 7 * 86400000) {
+    if ((player.joined_on || absent >= 0) && joined && Date.parse(today) - Date.parse(joined) < 7 * 86400000) {
       probation.add(player.id);
     }
   }
