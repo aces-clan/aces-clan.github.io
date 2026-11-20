@@ -34,13 +34,14 @@
     return dialog;
   }
 
-  const open = button('Указать свои вещи');
+  const open = button('Указать вещи и BM');
+  open.classList.add('gear-open');
   const actions = document.createElement('div');
   actions.className = 'gear-header-actions';
   authButton.before(actions);
   actions.append(open, authButton);
 
-  const dialog = makeDialog('gear-title', 'Указать свои вещи', `
+  const dialog = makeDialog('gear-title', 'Указать вещи и BM', `
     <form>
       <label for="gear-nickname">Выберите игрока из списка</label>
       <select id="gear-nickname" class="gear-picker" required disabled autofocus>
@@ -48,6 +49,9 @@
       </select>
       <fieldset class="gear-fields" disabled>
         <legend class="sr-only">Вещи</legend>
+        <label for="gear-power">Боевая мощь</label>
+        <input id="gear-power" type="number" min="1" max="2147483647" step="1" inputmode="numeric" autocomplete="off" aria-describedby="gear-power-hint">
+        <p id="gear-power-hint" class="gear-hint">Укажите, если изменилась.</p>
         ${items.map(([key, label]) => `
           <div class="gear-item${['weapon', 'boots', 'belt'].includes(key) ? ' gear-group-end' : ''}" role="group" aria-labelledby="gear-${key}">
             <span id="gear-${key}">${label}</span>
@@ -58,13 +62,14 @@
             </div>
           </div>`).join('')}
       </fieldset>
-      <p class="gear-hint">Вещи обновятся после подтверждения заявки.</p>
+      <p class="gear-hint">Вещи и боевая мощь обновятся после подтверждения заявки.</p>
       <p role="status"></p>
       <button type="submit" class="site-button site-button-primary gear-save" disabled>Сохранить</button>
     </form>`);
   const form = dialog.querySelector('form');
   const picker = dialog.querySelector('#gear-nickname');
   const fields = dialog.querySelector('.gear-fields');
+  const power = dialog.querySelector('#gear-power');
   const status = dialog.querySelector('[role="status"]');
   const save = form.querySelector('[type="submit"]');
   const close = dialog.querySelector('.site-dialog-close');
@@ -86,6 +91,7 @@
   picker.onchange = async () => {
     const selection = ++selectionVersion;
     originalEquipment = undefined;
+    power.value = '';
     fields.disabled = true;
     save.disabled = true;
     const player = picker.value;
@@ -146,22 +152,23 @@
     }
   };
 
-  fields.onchange = () => {
+  fields.oninput = fields.onchange = () => {
     status.textContent = '';
-    save.disabled = !originalEquipment || items.every(([key]) =>
-      form.elements[key].value === originalEquipment[key]);
+    save.disabled = !originalEquipment || !power.validity.valid || (power.value === '' &&
+      items.every(([key]) => form.elements[key].value === originalEquipment[key]));
   };
   dialog.addEventListener('cancel', event => {
     if (close.disabled) event.preventDefault();
   });
   form.onsubmit = async event => {
     event.preventDefault();
-    if (save.disabled || !picker.value) return;
+    if (save.disabled || !picker.value || !form.reportValidity()) return;
     const equipment = Object.fromEntries(new FormData(form));
+    const battlePower = power.value === '' ? null : Number(power.value);
     close.disabled = picker.disabled = fields.disabled = save.disabled = true;
     status.textContent = 'Отправляем заявку…';
     try {
-      await gearRequest('aces_submit_gear', {player_id: picker.value, equipment});
+      await gearRequest('aces_submit_gear', {player_id: picker.value, equipment, p_battle_power: battlePower});
       dialog.close();
       refreshQueue();
     } catch {
@@ -186,7 +193,7 @@
     });
   }
 
-  async function loadQueue(confirmed = false) {
+  async function loadQueue(result = '') {
     const version = ++queueVersion;
     if (queue && !requestList.children.length && !queueStatus.textContent) {
       queueStatus.textContent = 'Загружаем заявки…';
@@ -197,15 +204,15 @@
       if (requestsNav) requestsNav.textContent = requests.length ? `Заявки (${requests.length})` : 'Заявки';
       if (queue) {
         const empty = requests.length ? '' : 'Нет заявок на подтверждение.';
-        queueStatus.textContent = confirmed
-          ? (requests.length ? 'Заявка подтверждена.' : 'Заявка подтверждена. Очередь пуста.')
+        queueStatus.textContent = result
+          ? `Заявка ${result}.${requests.length ? '' : ' Очередь пуста.'}`
           : empty;
         requestList.replaceChildren(...requests.map(renderRequest));
       }
     } catch {
       if (version !== queueVersion || !queue) return;
-      queueStatus.textContent = confirmed
-        ? 'Заявка подтверждена. Не удалось обновить список.'
+      queueStatus.textContent = result
+        ? `Заявка ${result}. Не удалось обновить список.`
         : 'Не удалось загрузить заявки. Проверьте вход и откройте раздел ещё раз.';
     }
   }
@@ -231,8 +238,16 @@
       unchanged.textContent = 'Без изменений по вещам.';
       card.append(unchanged);
     }
+    if (Object.hasOwn(request.changes, 'battle_power')) {
+      const change = document.createElement('p');
+      const previous = request.before.battle_power;
+      change.textContent = `Боевая мощь · ${previous == null ? 'не указана' : fmt(previous)} → ${fmt(request.changes.battle_power)}`;
+      card.append(change);
+    }
 
     const approve = button('Подтвердить', true);
+    const reject = button('Отклонить');
+    reject.setAttribute('aria-label', `Отклонить заявку игрока ${request.name}`);
     approve.setAttribute('aria-label', `Подтвердить заявку игрока ${request.name}`);
     approve.disabled = !request.active;
     if (!request.active) {
@@ -241,7 +256,7 @@
       card.append(inactive);
     }
     approve.onclick = async () => {
-      approve.disabled = true;
+      approve.disabled = reject.disabled = true;
       queueStatus.textContent = '';
       try {
         const approved = await adminRequest('aces_approve_gear', {
@@ -249,18 +264,40 @@
         });
         if (!approved) {
           await loadQueue();
-          queueStatus.textContent = 'Заявка или вещи игрока изменились. Проверьте список ещё раз.';
+          queueStatus.textContent = 'Заявка или данные игрока изменились. Проверьте список ещё раз.';
           return;
         }
         card.remove();
         document.dispatchEvent(new Event('aces-gear-saved'));
-        await loadQueue(true);
+        await loadQueue('подтверждена');
       } catch {
-        approve.disabled = false;
+        approve.disabled = !request.active;
+        reject.disabled = false;
         queueStatus.textContent = 'Не удалось подтвердить заявку. Попробуйте ещё раз.';
       }
     };
-    card.append(approve);
+    reject.onclick = async () => {
+      approve.disabled = reject.disabled = true;
+      queueStatus.textContent = '';
+      try {
+        const rejected = await adminRequest('aces_reject_gear', {p_request_id: request.id});
+        if (!rejected) {
+          await loadQueue();
+          queueStatus.textContent = 'Заявка уже изменилась или обработана. Проверьте список ещё раз.';
+          return;
+        }
+        card.remove();
+        await loadQueue('отклонена');
+      } catch {
+        approve.disabled = !request.active;
+        reject.disabled = false;
+        queueStatus.textContent = 'Не удалось отклонить заявку. Попробуйте ещё раз.';
+      }
+    };
+    const actions = document.createElement('div');
+    actions.className = 'gear-header-actions';
+    actions.append(approve, reject);
+    card.append(actions);
     return card;
   }
 
